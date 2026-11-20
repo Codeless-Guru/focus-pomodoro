@@ -1,6 +1,6 @@
 """桌面番茄钟核心包。"""
 
-VERSION = "0.3.0"
+VERSION = "0.3.1"
 
 from .calendar_store import CalendarEvent, CalendarStore
 from .duration_presets import PRESETS, DurationPreset, find_preset
