@@ -19,8 +19,9 @@ class SettingsTests(unittest.TestCase):
             auto_start_next=False,
             sound_enabled=False,
             always_on_top=True,
+            calendar_alerts_enabled=False,
             task_name="写季度总结",
-            theme_key="fairy",
+            theme_key="apple_purple",
         )
 
         with tempfile.TemporaryDirectory() as directory:
@@ -57,7 +58,8 @@ class SettingsTests(unittest.TestCase):
         self.assertEqual(loaded.timer.short_break_minutes, 5)
         self.assertFalse(loaded.sound_enabled)
         self.assertTrue(loaded.auto_start_next)
-        self.assertEqual(loaded.theme_key, "business")
+        self.assertTrue(loaded.calendar_alerts_enabled)
+        self.assertEqual(loaded.theme_key, "apple_light")
 
 
 if __name__ == "__main__":

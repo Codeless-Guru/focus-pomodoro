@@ -6,9 +6,12 @@
 from __future__ import annotations
 
 import tkinter as tk
+from datetime import datetime
 from pathlib import Path
 from tkinter import ttk
 
+from .calendar_dialog import CalendarDialog
+from .calendar_store import CalendarStore
 from .duration_dialog import DurationDialog
 from .feature_dialogs import RewardDialog, StatsDialog, TaskDialog
 from .settings import load_settings, save_settings
@@ -49,6 +52,9 @@ class PomodoroApp:
         data_dir = self.settings_path.parent if self.settings_path is not None else None
         self.task_store = TaskStore(data_dir / "tasks.json" if data_dir else None)
         self.stats_store = StatsStore(data_dir / "stats.json" if data_dir else None)
+        self.calendar_store = CalendarStore(
+            data_dir / "calendar.json" if data_dir else None
+        )
 
         # 记录弹窗、设置面板、定时回调和窗口抖动等界面状态。
         self._toast: tk.Toplevel | None = None
@@ -368,19 +374,46 @@ class PomodoroApp:
             text="任务计划",
             style="Tool.TButton",
             command=self.open_task_dialog,
-        ).pack(side="left", fill="x", expand=True, padx=(0, 4))
+        ).pack(side="left", fill="x", expand=True, padx=(0, 3))
+        ttk.Button(
+            advanced_row,
+            text="日历闹钟",
+            style="Tool.TButton",
+            command=self.open_calendar_dialog,
+        ).pack(side="left", fill="x", expand=True, padx=3)
         ttk.Button(
             advanced_row,
             text="专注数据",
             style="Tool.TButton",
             command=self.open_stats_dialog,
-        ).pack(side="left", fill="x", expand=True, padx=4)
+        ).pack(side="left", fill="x", expand=True, padx=3)
         ttk.Button(
             advanced_row,
             text="休息奖励",
             style="Tool.TButton",
             command=self.open_reward_dialog,
-        ).pack(side="left", fill="x", expand=True, padx=(4, 0))
+        ).pack(side="left", fill="x", expand=True, padx=(3, 0))
+
+        calendar_card = tk.Frame(
+            container,
+            bg=self.colors["card"],
+            padx=12,
+            pady=8,
+            highlightbackground=self.colors["track"],
+            highlightthickness=1,
+        )
+        calendar_card.pack(fill="x", pady=(8, 0))
+        self.calendar_summary_label = tk.Label(
+            calendar_card,
+            text="今日提醒：暂无安排",
+            bg=self.colors["card"],
+            fg=self.colors["muted"],
+            font=(self.font, 9),
+            anchor="w",
+            justify="left",
+            wraplength=400,
+        )
+        self.calendar_summary_label.pack(fill="x")
 
         self.settings_frame = ttk.Frame(container, style="Card.TFrame", padding=12)
         self._build_settings(self.settings_frame)
@@ -492,6 +525,9 @@ class PomodoroApp:
         self.auto_start_var = tk.BooleanVar(value=self.settings.auto_start_next)
         self.sound_var = tk.BooleanVar(value=self.settings.sound_enabled)
         self.topmost_var = tk.BooleanVar(value=self.settings.always_on_top)
+        self.calendar_alerts_var = tk.BooleanVar(
+            value=self.settings.calendar_alerts_enabled
+        )
         self.theme_var = tk.StringVar(value=self.theme.name)
 
         theme_row = ttk.Frame(parent)
@@ -545,6 +581,12 @@ class PomodoroApp:
             parent,
             text="窗口始终在最前",
             variable=self.topmost_var,
+            style="TCheckbutton",
+        ).pack(anchor="w", pady=4)
+        ttk.Checkbutton(
+            parent,
+            text="启用日历闹钟提醒",
+            variable=self.calendar_alerts_var,
             style="TCheckbutton",
         ).pack(anchor="w", pady=4)
 
@@ -613,6 +655,17 @@ class PomodoroApp:
         dialog = RewardDialog(self.root, self.theme)
         self.root.wait_window(dialog)
 
+    def open_calendar_dialog(self) -> None:
+        """打开桌面日历，新增或修改的提醒会立即写入本地数据。"""
+        dialog = CalendarDialog(
+            self.root,
+            self.calendar_store,
+            self.theme,
+            on_change=self._render,
+        )
+        self.root.wait_window(dialog)
+        self._render()
+
     def _apply_duration_config(self, config: TimerConfig) -> None:
         """应用时长自定义模块返回的配置并写入设置文件。"""
         self.settings.timer = config
@@ -650,6 +703,7 @@ class PomodoroApp:
         self.settings.auto_start_next = self.auto_start_var.get()
         self.settings.sound_enabled = self.sound_var.get()
         self.settings.always_on_top = self.topmost_var.get()
+        self.settings.calendar_alerts_enabled = self.calendar_alerts_var.get()
         self.settings.task_name = self.task_var.get().strip()
         self.task_var.set(self.settings.task_name)
 
@@ -729,10 +783,11 @@ class PomodoroApp:
         self._tick_id = self.root.after(100, self._tick)
 
     def _tick(self) -> None:
-        """定时刷新：推进计时状态、处理阶段事件并重绘界面。"""
+        """定时刷新：推进计时、检查日历提醒、处理阶段事件并重绘界面。"""
         event = self.timer.update()
         if event is not None:
             self._notify(event)
+        self._check_calendar_alarms()
         self._render()
         self._schedule_tick()
 
@@ -753,6 +808,32 @@ class PomodoroApp:
         else:
             self._show_toast("休息结束", "回到专注，开始下一个番茄钟")
         self._play_sound()
+
+    def _check_calendar_alarms(self, now: datetime | None = None) -> None:
+        """检查到点的日历闹钟，用一条通知合并本轮到期的提醒。"""
+        if not self.settings.calendar_alerts_enabled:
+            return
+        due_events = self.calendar_store.due_events(now)
+        if not due_events:
+            return
+
+        self._restore_and_shake()
+        if len(due_events) == 1:
+            event = due_events[0]
+            message = f"{event.event_time.strftime('%H:%M')} · {event.title}"
+            if event.note:
+                message += f"\n{event.note}"
+        else:
+            message = "；".join(
+                f"{event.event_time.strftime('%H:%M')} {event.title}"
+                for event in due_events
+            )
+        self._show_toast("日历提醒", message)
+        self._play_sound()
+
+        current = now or datetime.now()
+        for event in due_events:
+            self.calendar_store.mark_triggered(event.id, current)
 
     def _restore_and_shake(self) -> None:
         """阶段结束时恢复最小化窗口，并让主窗口短暂左右抖动提醒。"""
@@ -971,6 +1052,11 @@ class PomodoroApp:
             )
         self.active_task_label.configure(text=task_text)
 
+        if hasattr(self, "calendar_summary_label"):
+            self.calendar_summary_label.configure(
+                text=self.calendar_store.next_summary()
+            )
+
     def _draw_ring(
         self,
         remaining_seconds: int,
@@ -1023,6 +1109,7 @@ class PomodoroApp:
         save_settings(self.settings, self.settings_path)
         self.task_store.save()
         self.stats_store.save()
+        self.calendar_store.save()
         if self._tick_id is not None:
             try:
                 self.root.after_cancel(self._tick_id)

@@ -24,6 +24,7 @@ class AppSettings:
     auto_start_next: bool = True
     sound_enabled: bool = True
     always_on_top: bool = False
+    calendar_alerts_enabled: bool = True
     task_name: str = ""
     theme_key: str = DEFAULT_THEME_KEY
 
@@ -36,6 +37,7 @@ class AppSettings:
             "auto_start_next": self.auto_start_next,
             "sound_enabled": self.sound_enabled,
             "always_on_top": self.always_on_top,
+            "calendar_alerts_enabled": self.calendar_alerts_enabled,
             "task_name": self.task_name,
             "theme_key": self.theme_key,
         }
@@ -64,6 +66,9 @@ class AppSettings:
             sound_enabled=_read_bool(data, "sound_enabled", default.sound_enabled),
             always_on_top=_read_bool(
                 data, "always_on_top", default.always_on_top
+            ),
+            calendar_alerts_enabled=_read_bool(
+                data, "calendar_alerts_enabled", default.calendar_alerts_enabled
             ),
             task_name=_read_str(data, "task_name", default.task_name),
             theme_key=_read_theme_key(data, "theme_key", default.theme_key),
