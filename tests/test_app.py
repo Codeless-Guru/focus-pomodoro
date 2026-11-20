@@ -162,8 +162,10 @@ class AppSmokeTests(unittest.TestCase):
                 root.update()
 
                 app.toggle_settings()
+                self.assertTrue(hasattr(app, "main_canvas"))
+
                 app.theme_var.set("国风")
-                app.apply_settings()
+                app.on_theme_selected()
                 root.update()
 
                 self.assertEqual(app.theme.key, "guofeng")

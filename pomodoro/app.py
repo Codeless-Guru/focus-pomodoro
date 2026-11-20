@@ -184,9 +184,35 @@ class PomodoroApp:
         )
 
     def _build_ui(self) -> None:
-        """创建主界面控件：状态、进度环、任务输入、按钮和统计区。"""
-        container = ttk.Frame(self.root, padding=20)
-        container.pack(fill="both", expand=True)
+        """创建可滚动主界面：状态、进度环、任务、按钮、统计和设置区。"""
+        shell = ttk.Frame(self.root)
+        shell.pack(fill="both", expand=True)
+
+        self.main_canvas = tk.Canvas(
+            shell,
+            bg=self.colors["bg"],
+            highlightthickness=0,
+        )
+        scrollbar = ttk.Scrollbar(
+            shell,
+            orient="vertical",
+            command=self.main_canvas.yview,
+        )
+        container = ttk.Frame(self.main_canvas, padding=20)
+        container.bind(
+            "<Configure>",
+            lambda _event: self._update_scrollregion(),
+        )
+        self.main_canvas.create_window(
+            (0, 0),
+            window=container,
+            anchor="nw",
+            width=480,
+        )
+        self.main_canvas.configure(yscrollcommand=scrollbar.set)
+        self.main_canvas.pack(side="left", fill="both", expand=True)
+        scrollbar.pack(side="right", fill="y")
+        self.root.bind_all("<MouseWheel>", self._on_mousewheel)
 
         header = tk.Canvas(
             container,
@@ -383,6 +409,34 @@ class PomodoroApp:
             text="快捷键：空格 开始/暂停    R 重置    S 跳过",
             style="Hint.TLabel",
         ).pack(pady=(10, 0))
+        self._update_scrollregion()
+
+    def _update_scrollregion(self) -> None:
+        """根据内容高度更新滚动区域。"""
+        if not hasattr(self, "main_canvas"):
+            return
+        try:
+            self.main_canvas.update_idletasks()
+            self.main_canvas.configure(scrollregion=self.main_canvas.bbox("all"))
+        except tk.TclError:
+            pass
+
+    def _on_mousewheel(self, event: tk.Event) -> None:
+        """鼠标滚轮滚动主区域；输入框和数字框保持原行为。"""
+        if not hasattr(self, "main_canvas"):
+            return
+        try:
+            if event.widget.winfo_class() in (
+                "Entry",
+                "TEntry",
+                "Spinbox",
+                "TSpinbox",
+                "TCombobox",
+            ):
+                return
+            self.main_canvas.yview_scroll(int(-1 * (event.delta / 120)), "units")
+        except tk.TclError:
+            pass
 
     def _build_settings(self, parent: ttk.Frame) -> None:
         """创建常规设置面板；时长配置已独立到“时长自定义”模块。"""
@@ -395,18 +449,20 @@ class PomodoroApp:
         theme_row.pack(fill="x", pady=(0, 6))
         tk.Label(
             theme_row,
-            text="界面风格",
+            text="界面风格（选择后立即生效）",
             bg=self.colors["card"],
             fg=self.colors["text"],
             font=(self.font, 9),
         ).pack(side="left")
-        ttk.Combobox(
+        theme_combo = ttk.Combobox(
             theme_row,
             textvariable=self.theme_var,
             values=THEME_NAMES,
             state="readonly",
             width=12,
-        ).pack(side="right")
+        )
+        theme_combo.bind("<<ComboboxSelected>>", self.on_theme_selected)
+        theme_combo.pack(side="right")
 
         ttk.Checkbutton(
             parent,
@@ -429,7 +485,7 @@ class PomodoroApp:
 
         ttk.Button(
             parent,
-            text="应用设置",
+            text="应用其他设置",
             style="Primary.TButton",
             command=self.apply_settings,
         ).pack(fill="x", pady=(8, 0))
@@ -454,13 +510,17 @@ class PomodoroApp:
         self._render()
 
     def toggle_settings(self) -> None:
+        """展开或收起设置，并在展开后自动滚动到设置区域。"""
         self._settings_visible = not self._settings_visible
         if self._settings_visible:
             self.settings_frame.pack(fill="x", pady=(8, 0))
             self.settings_button.configure(text="收起设置")
+            self._update_scrollregion()
+            self.root.after(60, lambda: self.main_canvas.yview_moveto(1.0))
         else:
             self.settings_frame.pack_forget()
             self.settings_button.configure(text="设置")
+            self._update_scrollregion()
 
     def open_duration_dialog(self) -> None:
         """打开“时长自定义”弹窗，确认后由回调保存并应用新方案。"""
@@ -495,12 +555,17 @@ class PomodoroApp:
         save_settings(self.settings, self.settings_path)
         self._render()
 
-    def apply_settings(self) -> None:
-        """应用常规设置与界面风格，然后同步窗口状态并写入配置文件。"""
-        selected_theme = find_theme_by_name(self.theme_var.get()) or self.theme
-        theme_changed = selected_theme.key != self.theme.key
-
+    def on_theme_selected(self, _event: object | None = None) -> None:
+        """主题下拉框选择后立即应用，无需再点应用设置。"""
+        selected_theme = find_theme_by_name(self.theme_var.get())
+        if selected_theme is None or selected_theme.key == self.theme.key:
+            return
         self.settings.theme_key = selected_theme.key
+        save_settings(self.settings, self.settings_path)
+        self._apply_theme(selected_theme)
+
+    def apply_settings(self) -> None:
+        """应用常规设置，然后同步窗口状态并写入配置文件。"""
         self.settings.auto_start_next = self.auto_start_var.get()
         self.settings.sound_enabled = self.sound_var.get()
         self.settings.always_on_top = self.topmost_var.get()
@@ -513,11 +578,7 @@ class PomodoroApp:
         )
         self._apply_window_settings()
         save_settings(self.settings, self.settings_path)
-
-        if theme_changed:
-            self._apply_theme(selected_theme)
-        else:
-            self._render()
+        self._render()
 
     def _apply_theme(self, theme: ThemePreset) -> None:
         """切换主题时重建全部控件，并尽量保留设置面板展开状态。"""
@@ -546,6 +607,8 @@ class PomodoroApp:
         if settings_visible:
             self.settings_frame.pack(fill="x", pady=(8, 0))
             self.settings_button.configure(text="收起设置")
+            self._update_scrollregion()
+            self.root.after(60, lambda: self.main_canvas.yview_moveto(1.0))
         self._render()
 
     def _apply_window_settings(self) -> None:
