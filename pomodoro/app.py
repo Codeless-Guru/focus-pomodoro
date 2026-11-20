@@ -76,10 +76,14 @@ class PomodoroApp:
         self.root.bind("<Key>", self._on_key)
 
         self.root.update_idletasks()
-        width, height = 520, 840
-        x = (self.root.winfo_screenwidth() - width) // 2
-        y = max(0, (self.root.winfo_screenheight() - height) // 2 - 20)
+        screen_width = self.root.winfo_screenwidth()
+        screen_height = self.root.winfo_screenheight()
+        width = min(520, max(500, screen_width - 40))
+        height = min(840, max(680, screen_height - 40))
+        x = (screen_width - width) // 2
+        y = (screen_height - height) // 2
         self.root.geometry(f"{width}x{height}+{x}+{y}")
+        self.root.eval("tk::PlaceWindow . center")
 
     def _build_styles(self) -> None:
         style = ttk.Style(self.root)
@@ -204,12 +208,13 @@ class PomodoroApp:
             "<Configure>",
             lambda _event: self._update_scrollregion(),
         )
-        self.main_canvas.create_window(
+        self._canvas_window_item = self.main_canvas.create_window(
             (0, 0),
             window=container,
             anchor="nw",
-            width=480,
+            width=460,
         )
+        self.main_canvas.bind("<Configure>", self._center_content)
         self.main_canvas.configure(yscrollcommand=scrollbar.set)
         self.main_canvas.pack(side="left", fill="both", expand=True)
         scrollbar.pack(side="right", fill="y")
@@ -217,7 +222,7 @@ class PomodoroApp:
 
         header = tk.Canvas(
             container,
-            width=480,
+            width=460,
             height=74,
             bg=self.colors["card"],
             highlightthickness=0,
@@ -226,7 +231,7 @@ class PomodoroApp:
             header,
             0,
             0,
-            480,
+            460,
             74,
             self.colors["card"],
             self.colors["card_light"],
@@ -249,9 +254,9 @@ class PomodoroApp:
             anchor="w",
         )
         header.create_oval(
-            438, 17, 466, 45, outline=self.colors["focus"], width=2
+            416, 17, 444, 45, outline=self.colors["focus"], width=2
         )
-        header.create_oval(447, 26, 457, 36, fill=self.colors["focus"], outline="")
+        header.create_oval(425, 26, 435, 36, fill=self.colors["focus"], outline="")
         header.pack(fill="x")
 
         ring_card = tk.Frame(
@@ -411,6 +416,7 @@ class PomodoroApp:
             style="Hint.TLabel",
         ).pack(pady=(10, 0))
         self._update_scrollregion()
+        self._center_content()
 
     def _update_scrollregion(self) -> None:
         """根据内容高度更新滚动区域。"""
@@ -419,6 +425,18 @@ class PomodoroApp:
         try:
             self.main_canvas.update_idletasks()
             self.main_canvas.configure(scrollregion=self.main_canvas.bbox("all"))
+        except tk.TclError:
+            pass
+
+    def _center_content(self, _event: object | None = None) -> None:
+        """把固定宽度的主内容区域水平居中。"""
+        if not hasattr(self, "_canvas_window_item"):
+            return
+        try:
+            canvas_width = self.main_canvas.winfo_width()
+            content_width = 460
+            x = max(0, (canvas_width - content_width) // 2)
+            self.main_canvas.coords(self._canvas_window_item, x, 0)
         except tk.TclError:
             pass
 
