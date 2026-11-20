@@ -20,6 +20,7 @@ class SettingsTests(unittest.TestCase):
             sound_enabled=False,
             always_on_top=True,
             task_name="写季度总结",
+            theme_key="fairy",
         )
 
         with tempfile.TemporaryDirectory() as directory:
@@ -41,7 +42,13 @@ class SettingsTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "settings.json"
             path.write_text(
-                json.dumps({"focus_minutes": 40, "sound_enabled": False}),
+                json.dumps(
+                    {
+                        "focus_minutes": 40,
+                        "sound_enabled": False,
+                        "theme_key": "unknown",
+                    }
+                ),
                 encoding="utf-8",
             )
             loaded = load_settings(path)
@@ -50,6 +57,7 @@ class SettingsTests(unittest.TestCase):
         self.assertEqual(loaded.timer.short_break_minutes, 5)
         self.assertFalse(loaded.sound_enabled)
         self.assertTrue(loaded.auto_start_next)
+        self.assertEqual(loaded.theme_key, "business")
 
 
 if __name__ == "__main__":

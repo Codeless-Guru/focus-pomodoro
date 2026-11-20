@@ -3,6 +3,7 @@ import unittest
 
 from pomodoro.duration_dialog import CUSTOM_VALUE, DurationDialog
 from pomodoro.duration_presets import PRESETS
+from pomodoro.theme_presets import get_theme
 from pomodoro.timer import TimerConfig
 
 
@@ -18,9 +19,17 @@ class DurationDialogTests(unittest.TestCase):
         applied: list[TimerConfig] = []
         try:
             preset = PRESETS[1]
-            dialog = DurationDialog(root, TimerConfig(), lambda config: applied.append(config))
+            theme = get_theme("fresh")
+            dialog = DurationDialog(
+                root,
+                TimerConfig(),
+                lambda config: applied.append(config),
+                theme=theme,
+            )
             root.update()
 
+            self.assertEqual(dialog.theme.key, "fresh")
+            self.assertEqual(dialog.colors["bg"], theme.colors["bg"])
             dialog.preset_var.set(preset.name)
             dialog._select_preset()
             root.update()

@@ -28,23 +28,22 @@ goto :launch
 for /f "delims=" %%v in ('python -c "import platform; print(platform.python_version())" 2^>nul') do (
     set "PYTHON_LAUNCHER=python"
 )
-if not defined PYTHON_LAUNCHER goto :try_workbuddy
+if not defined PYTHON_LAUNCHER goto :try_pythonw
 set "PYTHON_ARGS="
 where pythonw >nul 2>nul
 if not errorlevel 1 set "PYTHON_LAUNCHER=pythonw"
 goto :launch
 
-:try_workbuddy
-for /d %%D in ("%USERPROFILE%\.workbuddy\binaries\python\versions\*") do (
-    if exist "%%D\python.exe" (
-        if exist "%%D\pythonw.exe" (
-            set "PYTHON_LAUNCHER=%%D\pythonw.exe"
-        ) else (
-            set "PYTHON_LAUNCHER=%%D\python.exe"
-        )
-    )
-)
-if not defined PYTHON_LAUNCHER goto :no_python
+:try_pythonw
+where pythonw >nul 2>nul
+if errorlevel 1 goto :try_env_python
+set "PYTHON_LAUNCHER=pythonw"
+set "PYTHON_ARGS="
+goto :launch
+
+:try_env_python
+if not defined POMODORO_PYTHON goto :no_python
+set "PYTHON_LAUNCHER=%POMODORO_PYTHON%"
 set "PYTHON_ARGS="
 goto :launch
 

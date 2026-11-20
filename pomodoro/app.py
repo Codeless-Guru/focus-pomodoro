@@ -11,6 +11,12 @@ from tkinter import ttk
 
 from .duration_dialog import DurationDialog
 from .settings import load_settings, save_settings
+from .theme_presets import (
+    THEME_NAMES,
+    ThemePreset,
+    find_theme_by_name,
+    get_theme,
+)
 from .timer import (
     Phase,
     PomodoroTimer,
@@ -18,22 +24,6 @@ from .timer import (
     TimerEvent,
     format_duration,
 )
-
-FONT = "Microsoft YaHei UI"
-COLORS = {
-    "bg": "#0B1220",
-    "card": "#111C31",
-    "card_light": "#182740",
-    "track": "#24314A",
-    "text": "#F1F5F9",
-    "muted": "#94A3B8",
-    "focus": "#38BDF8",
-    "focus_hover": "#7DD3FC",
-    "short": "#34D399",
-    "long": "#A78BFA",
-    "danger": "#FB7185",
-}
-
 
 class PomodoroApp:
     """主窗口控制器：创建界面、绑定交互，并把计时状态渲染到窗口。"""
@@ -43,6 +33,9 @@ class PomodoroApp:
         self.root = root
         self.settings_path = Path(settings_path) if settings_path is not None else None
         self.settings = load_settings(self.settings_path)
+        self.theme: ThemePreset = get_theme(self.settings.theme_key)
+        self.colors = self.theme.colors
+        self.font = self.theme.font
         self.timer = PomodoroTimer(
             self.settings.timer,
             auto_start_next=self.settings.auto_start_next,
@@ -66,7 +59,7 @@ class PomodoroApp:
     def _configure_window(self) -> None:
         """设置窗口标题、尺寸、关闭协议和全局快捷键。"""
         self.root.title("专注番茄钟")
-        self.root.configure(bg=COLORS["bg"])
+        self.root.configure(bg=self.colors["bg"])
         self.root.resizable(True, True)
         self.root.minsize(500, 680)
         self.root.protocol("WM_DELETE_WINDOW", self.on_close)
@@ -85,79 +78,79 @@ class PomodoroApp:
         except tk.TclError:
             pass
 
-        style.configure("TFrame", background=COLORS["bg"])
-        style.configure("Card.TFrame", background=COLORS["card"])
+        style.configure("TFrame", background=self.colors["bg"])
+        style.configure("Card.TFrame", background=self.colors["card"])
         style.configure(
             "TLabel",
-            background=COLORS["bg"],
-            foreground=COLORS["text"],
-            font=(FONT, 10),
+            background=self.colors["bg"],
+            foreground=self.colors["text"],
+            font=(self.font, 10),
         )
         style.configure(
             "Title.TLabel",
-            background=COLORS["bg"],
-            foreground=COLORS["text"],
-            font=(FONT, 22, "bold"),
+            background=self.colors["bg"],
+            foreground=self.colors["text"],
+            font=(self.font, 22, "bold"),
         )
         style.configure(
             "Sub.TLabel",
-            background=COLORS["bg"],
-            foreground=COLORS["muted"],
-            font=(FONT, 9),
+            background=self.colors["bg"],
+            foreground=self.colors["muted"],
+            font=(self.font, 9),
         )
         style.configure(
             "Hint.TLabel",
-            background=COLORS["bg"],
-            foreground=COLORS["muted"],
-            font=(FONT, 8),
+            background=self.colors["bg"],
+            foreground=self.colors["muted"],
+            font=(self.font, 8),
         )
         style.configure(
             "TButton",
-            font=(FONT, 10),
+            font=(self.font, 10),
             padding=8,
             borderwidth=0,
         )
         style.configure(
             "Primary.TButton",
-            background=COLORS["focus"],
-            foreground="#06121F",
-            font=(FONT, 11, "bold"),
+            background=self.colors["focus"],
+            foreground=self.colors["on_accent"],
+            font=(self.font, 11, "bold"),
             padding=(12, 11),
         )
         style.map(
             "Primary.TButton",
-            background=[("active", COLORS["focus_hover"])],
+            background=[("active", self.colors["focus_hover"])],
         )
         style.configure(
             "Secondary.TButton",
-            background=COLORS["card_light"],
-            foreground=COLORS["text"],
+            background=self.colors["card_light"],
+            foreground=self.colors["text"],
             padding=(12, 11),
         )
         style.map(
             "Secondary.TButton",
-            background=[("active", COLORS["track"])],
+            background=[("active", self.colors["track"])],
         )
         style.configure(
             "TCheckbutton",
-            background=COLORS["card"],
-            foreground=COLORS["text"],
-            font=(FONT, 9),
+            background=self.colors["card"],
+            foreground=self.colors["text"],
+            font=(self.font, 9),
         )
-        style.map("TCheckbutton", background=[("active", COLORS["card"])])
+        style.map("TCheckbutton", background=[("active", self.colors["card"])])
         style.configure(
             "TEntry",
-            fieldbackground=COLORS["card_light"],
-            foreground=COLORS["text"],
-            insertcolor=COLORS["text"],
+            fieldbackground=self.colors["card_light"],
+            foreground=self.colors["text"],
+            insertcolor=self.colors["text"],
             borderwidth=0,
             padding=8,
         )
         style.configure(
             "TSpinbox",
-            fieldbackground=COLORS["card_light"],
-            foreground=COLORS["text"],
-            insertcolor=COLORS["text"],
+            fieldbackground=self.colors["card_light"],
+            foreground=self.colors["text"],
+            insertcolor=self.colors["text"],
             borderwidth=0,
             padding=5,
         )
@@ -179,9 +172,9 @@ class PomodoroApp:
         self.phase_pill = tk.Label(
             container,
             text="专注 · 准备开始",
-            bg=COLORS["card_light"],
-            fg=COLORS["focus"],
-            font=(FONT, 10, "bold"),
+            bg=self.colors["card_light"],
+            fg=self.colors["focus"],
+            font=(self.font, 10, "bold"),
             padx=14,
             pady=5,
         )
@@ -191,7 +184,7 @@ class PomodoroApp:
             container,
             width=280,
             height=280,
-            bg=COLORS["bg"],
+            bg=self.colors["bg"],
             highlightthickness=0,
         )
         self.canvas.pack(pady=(2, 6))
@@ -230,7 +223,7 @@ class PomodoroApp:
 
         stats = tk.Frame(
             container,
-            bg=COLORS["card"],
+            bg=self.colors["card"],
             padx=10,
             pady=10,
             highlightthickness=0,
@@ -239,20 +232,20 @@ class PomodoroApp:
         self.completed_label = tk.Label(
             stats,
             text="已完成\n0 个",
-            bg=COLORS["card"],
-            fg=COLORS["text"],
-            font=(FONT, 10, "bold"),
+            bg=self.colors["card"],
+            fg=self.colors["text"],
+            font=(self.font, 10, "bold"),
             justify="center",
         )
         self.completed_label.pack(side="left", fill="x", expand=True)
-        separator = tk.Frame(stats, bg=COLORS["track"], width=1)
+        separator = tk.Frame(stats, bg=self.colors["track"], width=1)
         separator.pack(side="left", fill="y", padx=8)
         self.round_label = tk.Label(
             stats,
             text="当前轮次\n1/4",
-            bg=COLORS["card"],
-            fg=COLORS["text"],
-            font=(FONT, 10, "bold"),
+            bg=self.colors["card"],
+            fg=self.colors["text"],
+            font=(self.font, 10, "bold"),
             justify="center",
         )
         self.round_label.pack(side="left", fill="x", expand=True)
@@ -288,6 +281,24 @@ class PomodoroApp:
         self.auto_start_var = tk.BooleanVar(value=self.settings.auto_start_next)
         self.sound_var = tk.BooleanVar(value=self.settings.sound_enabled)
         self.topmost_var = tk.BooleanVar(value=self.settings.always_on_top)
+        self.theme_var = tk.StringVar(value=self.theme.name)
+
+        theme_row = ttk.Frame(parent)
+        theme_row.pack(fill="x", pady=(0, 6))
+        tk.Label(
+            theme_row,
+            text="界面风格",
+            bg=self.colors["card"],
+            fg=self.colors["text"],
+            font=(self.font, 9),
+        ).pack(side="left")
+        ttk.Combobox(
+            theme_row,
+            textvariable=self.theme_var,
+            values=THEME_NAMES,
+            state="readonly",
+            width=12,
+        ).pack(side="right")
 
         ttk.Checkbutton(
             parent,
@@ -349,6 +360,7 @@ class PomodoroApp:
             self.root,
             self.settings.timer,
             self._apply_duration_config,
+            theme=self.theme,
         )
         self.root.wait_window(dialog)
 
@@ -360,7 +372,11 @@ class PomodoroApp:
         self._render()
 
     def apply_settings(self) -> None:
-        """应用常规设置，然后同步窗口状态并写入配置文件。"""
+        """应用常规设置与界面风格，然后同步窗口状态并写入配置文件。"""
+        selected_theme = find_theme_by_name(self.theme_var.get()) or self.theme
+        theme_changed = selected_theme.key != self.theme.key
+
+        self.settings.theme_key = selected_theme.key
         self.settings.auto_start_next = self.auto_start_var.get()
         self.settings.sound_enabled = self.sound_var.get()
         self.settings.always_on_top = self.topmost_var.get()
@@ -373,6 +389,39 @@ class PomodoroApp:
         )
         self._apply_window_settings()
         save_settings(self.settings, self.settings_path)
+
+        if theme_changed:
+            self._apply_theme(selected_theme)
+        else:
+            self._render()
+
+    def _apply_theme(self, theme: ThemePreset) -> None:
+        """切换主题时重建全部控件，并尽量保留设置面板展开状态。"""
+        settings_visible = self._settings_visible
+        self.theme = theme
+        self.colors = theme.colors
+        self.font = theme.font
+
+        if self._toast is not None:
+            try:
+                if self._toast.winfo_exists():
+                    self._toast.destroy()
+            except tk.TclError:
+                pass
+            self._toast = None
+
+        for child in list(self.root.winfo_children()):
+            child.destroy()
+
+        self.root.configure(bg=self.colors["bg"])
+        self._build_styles()
+        self._build_ui()
+        self._apply_window_settings()
+
+        self._settings_visible = settings_visible
+        if settings_visible:
+            self.settings_frame.pack(fill="x", pady=(8, 0))
+            self.settings_button.configure(text="收起设置")
         self._render()
 
     def _apply_window_settings(self) -> None:
@@ -542,26 +591,26 @@ class PomodoroApp:
         toast.attributes("-topmost", True)
         frame = tk.Frame(
             toast,
-            bg=COLORS["card"],
+            bg=self.colors["card"],
             padx=16,
             pady=12,
-            highlightbackground=COLORS["focus"],
+            highlightbackground=self.colors["focus"],
             highlightthickness=1,
         )
         frame.pack(fill="both", expand=True)
         tk.Label(
             frame,
             text=title,
-            bg=COLORS["card"],
-            fg=COLORS["focus"],
-            font=(FONT, 11, "bold"),
+            bg=self.colors["card"],
+            fg=self.colors["focus"],
+            font=(self.font, 11, "bold"),
         ).pack(anchor="w")
         tk.Label(
             frame,
             text=message,
-            bg=COLORS["card"],
-            fg=COLORS["text"],
-            font=(FONT, 9),
+            bg=self.colors["card"],
+            fg=self.colors["text"],
+            font=(self.font, 9),
         ).pack(anchor="w", pady=(4, 0))
 
         toast.update_idletasks()
@@ -583,9 +632,9 @@ class PomodoroApp:
         snapshot = self.timer.snapshot()
         phase = snapshot.phase
         accent = {
-            Phase.FOCUS: COLORS["focus"],
-            Phase.SHORT_BREAK: COLORS["short"],
-            Phase.LONG_BREAK: COLORS["long"],
+            Phase.FOCUS: self.colors["focus"],
+            Phase.SHORT_BREAK: self.colors["short"],
+            Phase.LONG_BREAK: self.colors["long"],
         }[phase]
 
         self._draw_ring(
@@ -636,7 +685,7 @@ class PomodoroApp:
             start=90,
             extent=-360,
             style=tk.ARC,
-            outline=COLORS["track"],
+            outline=self.colors["track"],
             width=12,
         )
         if progress > 0:
@@ -648,20 +697,20 @@ class PomodoroApp:
                 outline=accent,
                 width=12,
             )
-        self.canvas.create_oval(48, 48, 232, 232, fill=COLORS["card"], outline="")
+        self.canvas.create_oval(48, 48, 232, 232, fill=self.colors["card"], outline="")
         self.canvas.create_text(
             140,
             118,
             text=format_duration(remaining_seconds),
-            fill=COLORS["text"],
-            font=(FONT, 42, "bold"),
+            fill=self.colors["text"],
+            font=(self.font, 42, "bold"),
         )
         self.canvas.create_text(
             140,
             165,
             text=f"{phase_label}阶段",
-            fill=COLORS["muted"],
-            font=(FONT, 10),
+            fill=self.colors["muted"],
+            font=(self.font, 10),
         )
 
     def on_close(self) -> None:

@@ -10,6 +10,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Mapping
 
+from .theme_presets import DEFAULT_THEME_KEY, find_theme
 from .timer import TimerConfig
 
 # 默认把用户设置保存在主目录下，避免污染程序目录。
@@ -24,6 +25,7 @@ class AppSettings:
     sound_enabled: bool = True
     always_on_top: bool = False
     task_name: str = ""
+    theme_key: str = DEFAULT_THEME_KEY
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -35,6 +37,7 @@ class AppSettings:
             "sound_enabled": self.sound_enabled,
             "always_on_top": self.always_on_top,
             "task_name": self.task_name,
+            "theme_key": self.theme_key,
         }
 
     @classmethod
@@ -63,6 +66,7 @@ class AppSettings:
                 data, "always_on_top", default.always_on_top
             ),
             task_name=_read_str(data, "task_name", default.task_name),
+            theme_key=_read_theme_key(data, "theme_key", default.theme_key),
         )
 
 
@@ -74,6 +78,13 @@ def _read_bool(data: Mapping[str, Any], key: str, default: bool) -> bool:
 def _read_str(data: Mapping[str, Any], key: str, default: str) -> str:
     value = data.get(key, default)
     return value if isinstance(value, str) else default
+
+
+def _read_theme_key(data: Mapping[str, Any], key: str, default: str) -> str:
+    value = data.get(key, default)
+    if isinstance(value, str) and find_theme(value) is not None:
+        return value
+    return default
 
 
 def load_settings(path: Path | str | None = None) -> AppSettings:

@@ -10,15 +10,8 @@ from tkinter import messagebox, ttk
 from typing import Callable
 
 from .duration_presets import PRESETS, DurationPreset, find_preset
+from .theme_presets import ThemePreset, get_theme
 from .timer import TimerConfig
-
-FONT = "Microsoft YaHei UI"
-BG = "#0B1220"
-CARD = "#111C31"
-TEXT = "#F1F5F9"
-MUTED = "#94A3B8"
-TRACK = "#24314A"
-ACCENT = "#38BDF8"
 
 CUSTOM_VALUE = "__custom__"
 
@@ -38,10 +31,14 @@ class DurationDialog(tk.Toplevel):
         master: tk.Misc,
         current: TimerConfig,
         on_apply: Callable[[TimerConfig], None],
+        theme: ThemePreset | None = None,
     ) -> None:
         super().__init__(master)
+        self.theme = theme or get_theme(None)
+        self.colors = self.theme.colors
+        self.font = self.theme.font
         self.title("时长自定义")
-        self.configure(bg=BG)
+        self.configure(bg=self.colors["bg"])
         self.resizable(False, False)
         self.transient(master)
         self.on_apply = on_apply
@@ -75,24 +72,24 @@ class DurationDialog(tk.Toplevel):
             style.theme_use("clam")
         except tk.TclError:
             pass
-        style.configure("Dialog.TCheckbutton", font=(FONT, 9))
+        style.configure("Dialog.TCheckbutton", font=(self.font, 9))
         style.configure(
             "Dialog.TButton",
-            font=(FONT, 9),
+            font=(self.font, 9),
             padding=(10, 7),
         )
         style.configure(
             "Dialog.Primary.TButton",
-            background=ACCENT,
-            foreground="#06121F",
-            font=(FONT, 9, "bold"),
+            background=self.colors['focus'],
+            foreground=self.colors['on_accent'],
+            font=(self.font, 9, "bold"),
             padding=(10, 7),
         )
         style.configure(
             "TSpinbox",
-            fieldbackground=CARD,
-            foreground=TEXT,
-            insertcolor=TEXT,
+            fieldbackground=self.colors['card'],
+            foreground=self.colors['text'],
+            insertcolor=self.colors['text'],
             borderwidth=0,
             padding=5,
         )
@@ -106,24 +103,24 @@ class DurationDialog(tk.Toplevel):
         tk.Label(
             container,
             text="时长自定义",
-            bg=BG,
-            fg=TEXT,
-            font=(FONT, 16, "bold"),
+            bg=self.colors['bg'],
+            fg=self.colors['text'],
+            font=(self.font, 16, "bold"),
         ).grid(row=0, column=0, sticky="w")
         tk.Label(
             container,
             text="选择预设方案，或在下方填写自己的节奏。",
-            bg=BG,
-            fg=MUTED,
-            font=(FONT, 9),
+            bg=self.colors['bg'],
+            fg=self.colors['muted'],
+            font=(self.font, 9),
         ).grid(row=1, column=0, sticky="w", pady=(4, 12))
 
         presets_frame = tk.LabelFrame(
             container,
             text="预设方案",
-            bg=BG,
-            fg=MUTED,
-            font=(FONT, 9),
+            bg=self.colors['bg'],
+            fg=self.colors['muted'],
+            font=(self.font, 9),
             padx=10,
             pady=8,
         )
@@ -134,9 +131,9 @@ class DurationDialog(tk.Toplevel):
         custom_frame = tk.LabelFrame(
             container,
             text="自定义参数",
-            bg=BG,
-            fg=MUTED,
-            font=(FONT, 9),
+            bg=self.colors['bg'],
+            fg=self.colors['muted'],
+            font=(self.font, 9),
             padx=10,
             pady=8,
         )
@@ -176,7 +173,7 @@ class DurationDialog(tk.Toplevel):
         row: int,
         value: str | None = None,
     ) -> None:
-        card = tk.Frame(parent, bg=CARD, padx=10, pady=6)
+        card = tk.Frame(parent, bg=self.colors['card'], padx=10, pady=6)
         card.grid(row=row, column=0, sticky="ew", pady=3)
         card.columnconfigure(0, weight=1)
         tk.Radiobutton(
@@ -185,19 +182,19 @@ class DurationDialog(tk.Toplevel):
             variable=self.preset_var,
             value=value or preset.name,
             command=self._select_preset,
-            bg=CARD,
-            fg=TEXT,
-            activebackground=CARD,
-            selectcolor=TRACK,
-            font=(FONT, 9, "bold"),
+            bg=self.colors['card'],
+            fg=self.colors['text'],
+            activebackground=self.colors['card'],
+            selectcolor=self.colors['track'],
+            font=(self.font, 9, "bold"),
             anchor="w",
         ).grid(row=0, column=0, sticky="w")
         tk.Label(
             card,
             text=preset.description,
-            bg=CARD,
-            fg=MUTED,
-            font=(FONT, 8),
+            bg=self.colors['card'],
+            fg=self.colors['muted'],
+            font=(self.font, 8),
             wraplength=360,
             justify="left",
         ).grid(row=1, column=0, sticky="w", pady=(2, 0))
@@ -214,9 +211,9 @@ class DurationDialog(tk.Toplevel):
             tk.Label(
                 parent,
                 text=label,
-                bg=BG,
-                fg=TEXT,
-                font=(FONT, 9),
+                bg=self.colors['bg'],
+                fg=self.colors['text'],
+                font=(self.font, 9),
             ).grid(row=row, column=0, sticky="w", pady=4)
             ttk.Spinbox(
                 parent,
