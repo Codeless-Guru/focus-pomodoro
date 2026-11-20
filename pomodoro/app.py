@@ -56,6 +56,7 @@ class PomodoroApp:
         self._tick_id: str | None = None
         self._shaking = False
         self._topmost_reset_id: str | None = None
+        self._preview_theme_key: str | None = None
 
         # 固定顺序：先配置窗口，再建样式和控件，最后启动定时刷新。
         self._configure_window()
@@ -449,7 +450,7 @@ class PomodoroApp:
         theme_row.pack(fill="x", pady=(0, 6))
         tk.Label(
             theme_row,
-            text="界面风格（选择后立即生效）",
+            text="界面风格（选择后预览）",
             bg=self.colors["card"],
             fg=self.colors["text"],
             font=(self.font, 9),
@@ -463,6 +464,22 @@ class PomodoroApp:
         )
         theme_combo.bind("<<ComboboxSelected>>", self.on_theme_selected)
         theme_combo.pack(side="right")
+
+        self.preview_status_label = tk.Label(
+            parent,
+            text="",
+            bg=self.colors["card"],
+            fg=self.colors["muted"],
+            font=(self.font, 8),
+            anchor="w",
+        )
+        self.preview_status_label.pack(fill="x", pady=(0, 4))
+        ttk.Button(
+            parent,
+            text="还原主题预览",
+            style="Tool.TButton",
+            command=self.cancel_theme_preview,
+        ).pack(fill="x", pady=(0, 8))
 
         ttk.Checkbutton(
             parent,
@@ -485,7 +502,7 @@ class PomodoroApp:
 
         ttk.Button(
             parent,
-            text="应用其他设置",
+            text="应用设置",
             style="Primary.TButton",
             command=self.apply_settings,
         ).pack(fill="x", pady=(8, 0))
@@ -556,16 +573,32 @@ class PomodoroApp:
         self._render()
 
     def on_theme_selected(self, _event: object | None = None) -> None:
-        """主题下拉框选择后立即应用，无需再点应用设置。"""
+        """选择主题时只预览效果，不写入配置文件。"""
         selected_theme = find_theme_by_name(self.theme_var.get())
         if selected_theme is None or selected_theme.key == self.theme.key:
             return
-        self.settings.theme_key = selected_theme.key
-        save_settings(self.settings, self.settings_path)
+        self._preview_theme_key = selected_theme.key
         self._apply_theme(selected_theme)
 
+    def cancel_theme_preview(self) -> None:
+        """放弃主题预览，恢复到已保存的风格。"""
+        saved_theme = get_theme(self.settings.theme_key)
+        self._preview_theme_key = None
+        if self.theme.key != saved_theme.key:
+            self._apply_theme(saved_theme)
+        else:
+            self.theme_var.set(saved_theme.name)
+            self._render()
+
     def apply_settings(self) -> None:
-        """应用常规设置，然后同步窗口状态并写入配置文件。"""
+        """保存主题预览和常规设置，然后同步窗口状态。"""
+        selected_theme = find_theme_by_name(self.theme_var.get())
+        if selected_theme is None:
+            selected_theme = get_theme(self.settings.theme_key)
+        if selected_theme.key != self.settings.theme_key:
+            self.settings.theme_key = selected_theme.key
+        self._preview_theme_key = None
+
         self.settings.auto_start_next = self.auto_start_var.get()
         self.settings.sound_enabled = self.sound_var.get()
         self.settings.always_on_top = self.topmost_var.get()
@@ -578,7 +611,11 @@ class PomodoroApp:
         )
         self._apply_window_settings()
         save_settings(self.settings, self.settings_path)
-        self._render()
+
+        if selected_theme.key != self.theme.key:
+            self._apply_theme(selected_theme)
+        else:
+            self._render()
 
     def _apply_theme(self, theme: ThemePreset) -> None:
         """切换主题时重建全部控件，并尽量保留设置面板展开状态。"""
@@ -828,6 +865,18 @@ class PomodoroApp:
             Phase.SHORT_BREAK: self.colors["short"],
             Phase.LONG_BREAK: self.colors["long"],
         }[phase]
+
+        if hasattr(self, "preview_status_label"):
+            if self._preview_theme_key:
+                preview_text = "主题预览中：点击“应用设置”后保存"
+                preview_color = self.colors["focus"]
+            else:
+                preview_text = "选择主题会立即预览，点击“应用设置”后保存"
+                preview_color = self.colors["muted"]
+            self.preview_status_label.configure(
+                text=preview_text,
+                fg=preview_color,
+            )
 
         self._draw_ring(
             snapshot.remaining_whole_seconds,

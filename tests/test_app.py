@@ -170,9 +170,50 @@ class AppSmokeTests(unittest.TestCase):
 
                 self.assertEqual(app.theme.key, "guofeng")
                 self.assertEqual(app.colors["bg"], "#F3EBDD")
-                self.assertEqual(load_settings(settings_path).theme_key, "guofeng")
+                self.assertEqual(app._preview_theme_key, "guofeng")
+                self.assertEqual(load_settings(settings_path).theme_key, "business")
                 self.assertTrue(app._settings_visible)
                 self.assertEqual(app.theme_var.get(), "国风")
+
+                app.apply_settings()
+                root.update()
+
+                self.assertIsNone(app._preview_theme_key)
+                self.assertEqual(load_settings(settings_path).theme_key, "guofeng")
+                self.assertEqual(app.theme.key, "guofeng")
+
+                app.on_close()
+        finally:
+            try:
+                root.destroy()
+            except tk.TclError:
+                pass
+
+    def test_theme_preview_can_be_reverted(self) -> None:
+        try:
+            root = tk.Tk()
+        except tk.TclError as exc:
+            self.skipTest(f"当前环境没有图形界面：{exc}")
+            return
+
+        root.withdraw()
+        try:
+            with tempfile.TemporaryDirectory() as directory:
+                settings_path = Path(directory) / "settings.json"
+                app = PomodoroApp(root, settings_path)
+                root.update()
+
+                app.theme_var.set("儿童")
+                app.on_theme_selected()
+                root.update()
+                self.assertEqual(app.theme.key, "children")
+
+                app.cancel_theme_preview()
+                root.update()
+
+                self.assertEqual(app.theme.key, "business")
+                self.assertIsNone(app._preview_theme_key)
+                self.assertEqual(load_settings(settings_path).theme_key, "business")
 
                 app.on_close()
         finally:
