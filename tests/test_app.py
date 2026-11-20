@@ -26,6 +26,9 @@ class AppSmokeTests(unittest.TestCase):
                 app.settings.sound_enabled = False
                 root.update()
 
+                self.assertTrue(root.bind("<MouseWheel>"))
+                self.assertIsNone(root.bind_all("<MouseWheel>"))
+
                 app.toggle_timer()
                 root.update()
                 self.assertTrue(app.timer.is_running)

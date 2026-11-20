@@ -77,19 +77,36 @@ class PomodoroApp:
         self.root.title("专注番茄钟")
         self.root.configure(bg=self.colors["bg"])
         self.root.resizable(True, True)
-        self.root.minsize(500, 680)
+        self.root.minsize(460, 620)
         self.root.protocol("WM_DELETE_WINDOW", self.on_close)
         self.root.bind("<Key>", self._on_key)
 
         self.root.update_idletasks()
         screen_width = self.root.winfo_screenwidth()
         screen_height = self.root.winfo_screenheight()
-        width = min(520, max(500, screen_width - 40))
-        height = min(840, max(680, screen_height - 40))
+        width = min(520, max(460, screen_width - 40))
+        height = min(840, max(620, screen_height - 80))
         x = (screen_width - width) // 2
         y = (screen_height - height) // 2
         self.root.geometry(f"{width}x{height}+{x}+{y}")
-        self.root.eval("tk::PlaceWindow . center")
+        self._fit_window_to_screen()
+        self.root.after(100, self._fit_window_to_screen)
+
+    def _fit_window_to_screen(self) -> None:
+        """二次校正窗口位置，确保标题栏和底部都留在屏幕内。"""
+        try:
+            screen_width = self.root.winfo_screenwidth()
+            screen_height = self.root.winfo_screenheight()
+            x = self.root.winfo_rootx()
+            y = self.root.winfo_rooty()
+            width = self.root.winfo_width()
+            height = self.root.winfo_height()
+            target_x = min(max(0, x), max(0, screen_width - width))
+            target_y = min(max(0, y), max(0, screen_height - height))
+            if target_x != x or target_y != y:
+                self.root.geometry(f"+{target_x}+{target_y}")
+        except (tk.TclError, ValueError):
+            pass
 
     def _build_styles(self) -> None:
         style = ttk.Style(self.root)
@@ -224,7 +241,7 @@ class PomodoroApp:
         self.main_canvas.configure(yscrollcommand=scrollbar.set)
         self.main_canvas.pack(side="left", fill="both", expand=True)
         scrollbar.pack(side="right", fill="y")
-        self.root.bind_all("<MouseWheel>", self._on_mousewheel)
+        self.root.bind("<MouseWheel>", self._on_mousewheel)
 
         self.header_canvas = tk.Canvas(
             container,
