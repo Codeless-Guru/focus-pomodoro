@@ -27,6 +27,7 @@ from .timer import (
     TimerEvent,
     format_duration,
 )
+from .ui_utils import draw_gradient
 
 class PomodoroApp:
     """主窗口控制器：创建界面、绑定交互，并把计时状态渲染到窗口。"""
@@ -162,40 +163,98 @@ class PomodoroApp:
             borderwidth=0,
             padding=5,
         )
+        style.configure(
+            "TCombobox",
+            fieldbackground=self.colors["card_light"],
+            background=self.colors["card"],
+            foreground=self.colors["text"],
+            borderwidth=0,
+            padding=5,
+        )
+        style.configure(
+            "Tool.TButton",
+            background=self.colors["card"],
+            foreground=self.colors["text"],
+            font=(self.font, 9),
+            padding=(8, 9),
+        )
+        style.map(
+            "Tool.TButton",
+            background=[("active", self.colors["card_light"])],
+        )
 
     def _build_ui(self) -> None:
         """创建主界面控件：状态、进度环、任务输入、按钮和统计区。"""
         container = ttk.Frame(self.root, padding=20)
         container.pack(fill="both", expand=True)
 
-        header = ttk.Frame(container)
-        header.pack(fill="x")
-        ttk.Label(header, text="专注番茄钟", style="Title.TLabel").pack(
-            side="left", anchor="w"
-        )
-        ttk.Label(header, text="一次只做一件事", style="Sub.TLabel").pack(
-            side="right", anchor="e"
-        )
-
-        self.phase_pill = tk.Label(
+        header = tk.Canvas(
             container,
+            width=480,
+            height=74,
+            bg=self.colors["card"],
+            highlightthickness=0,
+        )
+        draw_gradient(
+            header,
+            0,
+            0,
+            480,
+            74,
+            self.colors["card"],
+            self.colors["card_light"],
+            48,
+        )
+        header.create_text(
+            18,
+            23,
+            text="专注番茄钟",
+            fill=self.colors["text"],
+            font=(self.font, 20, "bold"),
+            anchor="w",
+        )
+        header.create_text(
+            19,
+            51,
+            text="一次只做一件事",
+            fill=self.colors["muted"],
+            font=(self.font, 9),
+            anchor="w",
+        )
+        header.create_oval(
+            438, 17, 466, 45, outline=self.colors["focus"], width=2
+        )
+        header.create_oval(447, 26, 457, 36, fill=self.colors["focus"], outline="")
+        header.pack(fill="x")
+
+        ring_card = tk.Frame(
+            container,
+            bg=self.colors["card"],
+            padx=12,
+            pady=10,
+            highlightbackground=self.colors["track"],
+            highlightthickness=1,
+        )
+        ring_card.pack(fill="x", pady=(12, 4))
+        self.phase_pill = tk.Label(
+            ring_card,
             text="专注 · 准备开始",
-            bg=self.colors["card_light"],
+            bg=self.colors["card"],
             fg=self.colors["focus"],
             font=(self.font, 10, "bold"),
             padx=14,
-            pady=5,
+            pady=4,
         )
-        self.phase_pill.pack(pady=(14, 4))
+        self.phase_pill.pack()
 
         self.canvas = tk.Canvas(
-            container,
-            width=280,
-            height=280,
-            bg=self.colors["bg"],
+            ring_card,
+            width=300,
+            height=300,
+            bg=self.colors["card"],
             highlightthickness=0,
         )
-        self.canvas.pack(pady=(2, 6))
+        self.canvas.pack(pady=(4, 0))
 
         ttk.Label(container, text="当前任务", style="Sub.TLabel").pack(
             anchor="w", pady=(0, 4)
@@ -238,34 +297,45 @@ class PomodoroApp:
         self.reset_button.pack(side="left", fill="x", expand=True, padx=6)
         self.skip_button.pack(side="left", fill="x", expand=True, padx=(6, 0))
 
-        stats = tk.Frame(
-            container,
-            bg=self.colors["card"],
-            padx=10,
-            pady=10,
-            highlightthickness=0,
-        )
+        stats = tk.Frame(container, bg=self.colors["bg"])
         stats.pack(fill="x", pady=(14, 0))
-        self.completed_label = tk.Label(
-            stats,
-            text="已完成\n0 个",
-            bg=self.colors["card"],
-            fg=self.colors["text"],
-            font=(self.font, 10, "bold"),
-            justify="center",
+
+        def make_stat_card(title: str, value: str, color: str) -> tk.Label:
+            card = tk.Frame(
+                stats,
+                bg=self.colors["card"],
+                padx=8,
+                pady=8,
+                highlightbackground=self.colors["track"],
+                highlightthickness=1,
+            )
+            card.pack(side="left", fill="x", expand=True, padx=(0, 6))
+            tk.Label(
+                card,
+                text=title,
+                bg=self.colors["card"],
+                fg=self.colors["muted"],
+                font=(self.font, 8),
+            ).pack(anchor="w")
+            value_label = tk.Label(
+                card,
+                text=value,
+                bg=self.colors["card"],
+                fg=color,
+                font=(self.font, 14, "bold"),
+                anchor="w",
+            )
+            value_label.pack(anchor="w", pady=(3, 0))
+            return value_label
+
+        today_count = self.stats_store.summary().today_pomodoros
+        self.today_label = make_stat_card("今日番茄", str(today_count), self.colors["focus"])
+        self.completed_label = make_stat_card(
+            "累计完成", "0 个", self.colors["short"]
         )
-        self.completed_label.pack(side="left", fill="x", expand=True)
-        separator = tk.Frame(stats, bg=self.colors["track"], width=1)
-        separator.pack(side="left", fill="y", padx=8)
-        self.round_label = tk.Label(
-            stats,
-            text="当前轮次\n1/4",
-            bg=self.colors["card"],
-            fg=self.colors["text"],
-            font=(self.font, 10, "bold"),
-            justify="center",
+        self.round_label = make_stat_card(
+            "当前轮次", "1/4", self.colors["long"]
         )
-        self.round_label.pack(side="left", fill="x", expand=True)
 
         utility_row = ttk.Frame(container)
         utility_row.pack(fill="x", pady=(12, 0))
@@ -289,19 +359,19 @@ class PomodoroApp:
         ttk.Button(
             advanced_row,
             text="任务计划",
-            style="Secondary.TButton",
+            style="Tool.TButton",
             command=self.open_task_dialog,
         ).pack(side="left", fill="x", expand=True, padx=(0, 4))
         ttk.Button(
             advanced_row,
             text="专注数据",
-            style="Secondary.TButton",
+            style="Tool.TButton",
             command=self.open_stats_dialog,
         ).pack(side="left", fill="x", expand=True, padx=4)
         ttk.Button(
             advanced_row,
             text="休息奖励",
-            style="Secondary.TButton",
+            style="Tool.TButton",
             command=self.open_reward_dialog,
         ).pack(side="left", fill="x", expand=True, padx=(4, 0))
 
@@ -722,11 +792,13 @@ class PomodoroApp:
             action = f"开始{phase.label}"
         self.start_button.configure(text=action)
 
+        summary = self.stats_store.summary()
+        self.today_label.configure(text=str(summary.today_pomodoros))
         self.completed_label.configure(
-            text=f"已完成\n{snapshot.completed_focus_sessions} 个"
+            text=f"{snapshot.completed_focus_sessions} 个"
         )
         self.round_label.configure(
-            text=f"当前轮次\n{snapshot.cycle_index}/{snapshot.cycle_length}"
+            text=f"{snapshot.cycle_index}/{snapshot.cycle_length}"
         )
 
         active_task = self.task_store.active_task()
@@ -748,14 +820,14 @@ class PomodoroApp:
     ) -> None:
         """重绘进度环：外圈显示进度，中间显示剩余时间和阶段名称。"""
         self.canvas.delete("all")
-        bounds = (22, 22, 258, 258)
+        bounds = (24, 24, 276, 276)
         self.canvas.create_arc(
             *bounds,
             start=90,
             extent=-360,
             style=tk.ARC,
             outline=self.colors["track"],
-            width=12,
+            width=14,
         )
         if progress > 0:
             self.canvas.create_arc(
@@ -764,22 +836,25 @@ class PomodoroApp:
                 extent=-360 * progress,
                 style=tk.ARC,
                 outline=accent,
-                width=12,
+                width=14,
             )
-        self.canvas.create_oval(48, 48, 232, 232, fill=self.colors["card"], outline="")
+        self.canvas.create_oval(
+            54, 54, 246, 246, fill=self.colors["card"], outline=self.colors["track"]
+        )
+        self.canvas.create_oval(143, 12, 157, 26, fill=accent, outline="")
         self.canvas.create_text(
-            140,
-            118,
+            150,
+            128,
             text=format_duration(remaining_seconds),
             fill=self.colors["text"],
-            font=(self.font, 42, "bold"),
+            font=(self.font, 46, "bold"),
         )
         self.canvas.create_text(
-            140,
-            165,
+            150,
+            178,
             text=f"{phase_label}阶段",
             fill=self.colors["muted"],
-            font=(self.font, 10),
+            font=(self.font, 11),
         )
 
     def on_close(self) -> None:
