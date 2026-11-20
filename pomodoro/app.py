@@ -220,44 +220,19 @@ class PomodoroApp:
         scrollbar.pack(side="right", fill="y")
         self.root.bind_all("<MouseWheel>", self._on_mousewheel)
 
-        header = tk.Canvas(
+        self.header_canvas = tk.Canvas(
             container,
             width=460,
             height=74,
             bg=self.colors["card"],
             highlightthickness=0,
         )
-        draw_gradient(
-            header,
-            0,
-            0,
-            460,
-            74,
-            self.colors["card"],
-            self.colors["card_light"],
-            48,
+        self.header_canvas.bind(
+            "<Configure>",
+            lambda event: self._draw_header(event.width),
         )
-        header.create_text(
-            18,
-            23,
-            text="专注番茄钟",
-            fill=self.colors["text"],
-            font=(self.font, 20, "bold"),
-            anchor="w",
-        )
-        header.create_text(
-            19,
-            51,
-            text="一次只做一件事",
-            fill=self.colors["muted"],
-            font=(self.font, 9),
-            anchor="w",
-        )
-        header.create_oval(
-            416, 17, 444, 45, outline=self.colors["focus"], width=2
-        )
-        header.create_oval(425, 26, 435, 36, fill=self.colors["focus"], outline="")
-        header.pack(fill="x")
+        self._draw_header(460)
+        self.header_canvas.pack(fill="x")
 
         ring_card = tk.Frame(
             container,
@@ -438,6 +413,61 @@ class PomodoroApp:
             x = max(0, (canvas_width - content_width) // 2)
             self.main_canvas.coords(self._canvas_window_item, x, 0)
         except tk.TclError:
+            pass
+
+    def _draw_header(self, width: int) -> None:
+        """按标题卡实际宽度绘制渐变、文字和右侧装饰图标。"""
+        if not hasattr(self, "header_canvas"):
+            return
+        try:
+            canvas = self.header_canvas
+            canvas.delete("all")
+            actual_width = max(260, int(width))
+            draw_gradient(
+                canvas,
+                0,
+                0,
+                actual_width,
+                74,
+                self.colors["card"],
+                self.colors["card_light"],
+                48,
+            )
+            canvas.create_text(
+                18,
+                23,
+                text="专注番茄钟",
+                fill=self.colors["text"],
+                font=(self.font, 20, "bold"),
+                anchor="w",
+            )
+            canvas.create_text(
+                19,
+                51,
+                text="一次只做一件事",
+                fill=self.colors["muted"],
+                font=(self.font, 9),
+                anchor="w",
+            )
+            if actual_width > 320:
+                right = actual_width - 18
+                canvas.create_oval(
+                    right - 28,
+                    17,
+                    right,
+                    45,
+                    outline=self.colors["focus"],
+                    width=2,
+                )
+                canvas.create_oval(
+                    right - 19,
+                    26,
+                    right - 9,
+                    36,
+                    fill=self.colors["focus"],
+                    outline="",
+                )
+        except (tk.TclError, ValueError):
             pass
 
     def _on_mousewheel(self, event: tk.Event) -> None:
