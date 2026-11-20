@@ -7,6 +7,9 @@
 - 经典番茄工作法：专注、短休息、长休息自动切换。
 - 独立时长自定义模块：内置经典番茄、短时专注、深度工作、轻量循环四套预设，也支持完全自定义。
 - 界面风格自定义：国风、商务、儿童、仙女、清爽五套主题，切换即时生效并自动保存。
+- v0.2.0 任务计划：添加任务、估算番茄数、设置当前任务，专注完成后自动累加进度。
+- v0.2.0 专注数据：累计番茄、近 7 天趋势、连续打卡和成就展示。
+- v0.2.0 休息奖励：随机转盘决定休息方式。
 - 完成提醒：桌面弹窗、系统提示音、主窗口抖动；窗口最小化时会自动恢复并临时置顶。
 - 控制方式：开始、暂停、继续、重置、跳过。
 - 快捷键：空格开始/暂停，`R` 重置，`S` 跳过。
@@ -44,7 +47,10 @@ py -3 main.py
 - 在 `当前任务` 输入框中填写本次专注目标，内容会自动保存。
 - 点击 `开始专注` 开始计时，再次点击可暂停或继续。
 - 点击 `时长自定义` 打开独立窗口，选择预设方案或填写自定义时长。
-- 点击 `设置` 可调整自动开始下一阶段、提示音和窗口置顶。
+- 点击 `任务计划` 添加任务、设置估算番茄数，并指定当前任务。
+- 点击 `专注数据` 查看统计趋势和已解锁成就。
+- 点击 `休息奖励` 打开随机奖励转盘。
+- 点击 `设置` 可调整界面风格、自动开始下一阶段、提示音和窗口置顶。
 - 阶段自然结束时会计入完成次数；点击 `跳过` 不计入完成次数。
 - 更完整的中文说明见 [`使用说明.md`](使用说明.md)。
 
@@ -86,19 +92,21 @@ py -3 main.py
 
 ## 数据保存位置
 
-设置和当前任务保存在用户主目录：
+设置、任务和统计数据保存在用户主目录：
 
 ```text
 ~/.focus_pomodoro/settings.json
+~/.focus_pomodoro/tasks.json
+~/.focus_pomodoro/stats.json
 ```
 
-Windows 中通常位于：
+Windows 中目录为：
 
 ```text
-%USERPROFILE%\.focus_pomodoro\settings.json
+%USERPROFILE%\.focus_pomodoro\
 ```
 
-删除该文件即可恢复默认设置。
+删除对应文件即可分别恢复默认设置、清空任务或清空统计数据。
 
 ## 项目结构
 
@@ -111,16 +119,25 @@ Windows 中通常位于：
 ├── LICENSE                     MIT 许可证
 ├── pomodoro/
 │   ├── app.py                  Tkinter 主界面
+│   ├── achievements.py         成就判定
 │   ├── duration_dialog.py      时长自定义弹窗
 │   ├── duration_presets.py     时长方案预设
+│   ├── feature_dialogs.py      任务、统计和奖励弹窗
+│   ├── rewards.py              休息奖励内容
 │   ├── settings.py             设置读取与保存
+│   ├── stats.py                专注统计
+│   ├── tasks.py                任务计划
 │   ├── theme_presets.py        界面风格预设
 │   └── timer.py                计时核心逻辑
 └── tests/
+    ├── test_achievements.py
     ├── test_app.py
     ├── test_duration_dialog.py
     ├── test_duration_presets.py
+    ├── test_feature_dialogs.py
     ├── test_settings.py
+    ├── test_stats.py
+    ├── test_tasks.py
     └── test_timer.py
 ```
 

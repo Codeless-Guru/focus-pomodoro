@@ -10,7 +10,10 @@ from pathlib import Path
 from tkinter import ttk
 
 from .duration_dialog import DurationDialog
+from .feature_dialogs import RewardDialog, StatsDialog, TaskDialog
 from .settings import load_settings, save_settings
+from .stats import StatsStore
+from .tasks import TaskStore
 from .theme_presets import (
     THEME_NAMES,
     ThemePreset,
@@ -41,6 +44,11 @@ class PomodoroApp:
             auto_start_next=self.settings.auto_start_next,
         )
 
+        # 测试时传入的 settings_path 同时决定任务与统计文件的位置。
+        data_dir = self.settings_path.parent if self.settings_path is not None else None
+        self.task_store = TaskStore(data_dir / "tasks.json" if data_dir else None)
+        self.stats_store = StatsStore(data_dir / "stats.json" if data_dir else None)
+
         # 记录弹窗、设置面板、定时回调和窗口抖动等界面状态。
         self._toast: tk.Toplevel | None = None
         self._settings_visible = False
@@ -66,7 +74,7 @@ class PomodoroApp:
         self.root.bind("<Key>", self._on_key)
 
         self.root.update_idletasks()
-        width, height = 520, 760
+        width, height = 520, 840
         x = (self.root.winfo_screenwidth() - width) // 2
         y = max(0, (self.root.winfo_screenheight() - height) // 2 - 20)
         self.root.geometry(f"{width}x{height}+{x}+{y}")
@@ -196,6 +204,15 @@ class PomodoroApp:
         task_entry = ttk.Entry(container, textvariable=self.task_var, style="TEntry")
         task_entry.pack(fill="x")
         task_entry.bind("<FocusOut>", lambda _event: self._save_task_name())
+        self.active_task_label = tk.Label(
+            container,
+            text="当前计划：未设置",
+            bg=self.colors["bg"],
+            fg=self.colors["muted"],
+            font=(self.font, 8),
+            anchor="w",
+        )
+        self.active_task_label.pack(fill="x", pady=(3, 0))
 
         controls = ttk.Frame(container)
         controls.pack(fill="x", pady=(14, 0))
@@ -266,6 +283,27 @@ class PomodoroApp:
             command=self.toggle_settings,
         )
         self.settings_button.pack(side="left", fill="x", expand=True, padx=(6, 0))
+
+        advanced_row = ttk.Frame(container)
+        advanced_row.pack(fill="x", pady=(6, 0))
+        ttk.Button(
+            advanced_row,
+            text="任务计划",
+            style="Secondary.TButton",
+            command=self.open_task_dialog,
+        ).pack(side="left", fill="x", expand=True, padx=(0, 4))
+        ttk.Button(
+            advanced_row,
+            text="专注数据",
+            style="Secondary.TButton",
+            command=self.open_stats_dialog,
+        ).pack(side="left", fill="x", expand=True, padx=4)
+        ttk.Button(
+            advanced_row,
+            text="休息奖励",
+            style="Secondary.TButton",
+            command=self.open_reward_dialog,
+        ).pack(side="left", fill="x", expand=True, padx=(4, 0))
 
         self.settings_frame = ttk.Frame(container, style="Card.TFrame", padding=12)
         self._build_settings(self.settings_frame)
@@ -362,6 +400,22 @@ class PomodoroApp:
             self._apply_duration_config,
             theme=self.theme,
         )
+        self.root.wait_window(dialog)
+
+    def open_task_dialog(self) -> None:
+        """打开任务计划窗口，管理当前任务与番茄估算。"""
+        dialog = TaskDialog(self.root, self.task_store, self.theme)
+        self.root.wait_window(dialog)
+        self._render()
+
+    def open_stats_dialog(self) -> None:
+        """打开专注数据与成就窗口。"""
+        dialog = StatsDialog(self.root, self.stats_store, self.task_store, self.theme)
+        self.root.wait_window(dialog)
+
+    def open_reward_dialog(self) -> None:
+        """打开休息奖励转盘。"""
+        dialog = RewardDialog(self.root, self.theme)
         self.root.wait_window(dialog)
 
     def _apply_duration_config(self, config: TimerConfig) -> None:
@@ -472,7 +526,12 @@ class PomodoroApp:
 
         self._restore_and_shake()
         if event.from_phase is Phase.FOCUS:
-            self._show_toast("专注完成", "起来活动一下，准备进入休息阶段")
+            self.stats_store.record_focus(self.timer.config.focus_minutes)
+            finished_task = self.task_store.record_focus()
+            message = "起来活动一下，准备进入休息阶段"
+            if finished_task:
+                message += f"；任务已完成：{finished_task}"
+            self._show_toast("专注完成", message)
         else:
             self._show_toast("休息结束", "回到专注，开始下一个番茄钟")
         self._play_sound()
@@ -670,6 +729,16 @@ class PomodoroApp:
             text=f"当前轮次\n{snapshot.cycle_index}/{snapshot.cycle_length}"
         )
 
+        active_task = self.task_store.active_task()
+        if active_task is None:
+            task_text = "当前计划：未设置"
+        else:
+            task_text = (
+                f"当前计划：{active_task.name} "
+                f"({active_task.completed}/{active_task.estimate})"
+            )
+        self.active_task_label.configure(text=task_text)
+
     def _draw_ring(
         self,
         remaining_seconds: int,
@@ -717,6 +786,8 @@ class PomodoroApp:
         """关闭前保存设置并取消尚未执行的定时回调。"""
         self._save_task_name()
         save_settings(self.settings, self.settings_path)
+        self.task_store.save()
+        self.stats_store.save()
         if self._tick_id is not None:
             try:
                 self.root.after_cancel(self._tick_id)

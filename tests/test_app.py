@@ -179,6 +179,39 @@ class AppSmokeTests(unittest.TestCase):
             except tk.TclError:
                 pass
 
+    def test_focus_completion_records_task_and_stats(self) -> None:
+        try:
+            root = tk.Tk()
+        except tk.TclError as exc:
+            self.skipTest(f"当前环境没有图形界面：{exc}")
+            return
+
+        root.withdraw()
+        try:
+            with tempfile.TemporaryDirectory() as directory:
+                settings_path = Path(directory) / "settings.json"
+                app = PomodoroApp(root, settings_path)
+                app.settings.sound_enabled = False
+                task = app.task_store.add("写发布说明", 1)
+                app.task_store.select(task.id)
+
+                event = TimerEvent("completed", Phase.FOCUS, Phase.SHORT_BREAK)
+                with patch.object(app, "_restore_and_shake"), patch.object(
+                    app, "_show_toast"
+                ) as toast, patch.object(app, "_play_sound"):
+                    app._notify(event)
+
+                self.assertEqual(app.stats_store.summary().today_pomodoros, 1)
+                self.assertEqual(app.task_store.active_task().completed, 1)
+                self.assertIn("任务已完成", toast.call_args[0][1])
+
+                app.on_close()
+        finally:
+            try:
+                root.destroy()
+            except tk.TclError:
+                pass
+
 
 if __name__ == "__main__":
     unittest.main()
